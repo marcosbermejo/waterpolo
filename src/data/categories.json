@@ -1,0 +1,13 @@
+[
+    { "id": "1", "fcnId": "4815", "rfenId": "2090", "gender": "female", "name": "Absolut femení" },
+    { "id": "2", "fcnId": "4814", "rfenId": "2090", "gender": "male", "name": "Absolut masculí" },
+    { "id": "3", "fcnId": "3762", "name": "Juvenil femení" },
+    { "id": "4", "fcnId": "5877", "name": "Juvenil masculí" },
+    { "id": "5", "fcnId": "5879", "name": "Cadet femení" },
+    { "id": "6", "fcnId": "5878", "name": "Cadet masculí" },
+    { "id": "7", "fcnId": "5880", "name": "Infantil femení" },
+    { "id": "8", "fcnId": "2734", "name": "Infantil mixte" },
+    { "id": "9", "fcnId": "5881", "name": "Aleví femení" },
+    { "id": "10", "fcnId": "3747", "name": "Aleví mixte" },
+    { "id": "11", "fcnId": "3744", "name": "Benjamí mixte" }
+]

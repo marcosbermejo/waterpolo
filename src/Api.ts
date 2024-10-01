@@ -1,22 +1,7 @@
 import moment from 'moment';
 const url = 'https://api.leverade.com';
-const manager = '314965';
 const discipline = '14';
 const season = '7618';
-
-export const categories = [
-    { id: '4815', name: 'Absolut femení' },
-    { id: '4814', name: 'Absolut masculí' },
-    { id: '3762', name: 'Juvenil femení' },
-    { id: '5877', name: 'Juvenil masculí' },
-    { id: '5879', name: 'Cadet femení' },
-    { id: '5878', name: 'Cadet masculí' },
-    { id: '5880', name: 'Infantil femení' },
-    { id: '2734', name: 'Infantil mixte' },
-    { id: '5881', name: 'Aleví femení' },
-    { id: '3747', name: 'Aleví mixte' },
-    { id: '3744', name: 'Benjamí mixte' }
-]
 
 export type Match = {
     type: "match"
@@ -235,7 +220,7 @@ export type TeamsResponse = {
 
 export class Api {
 
-    static async getNextMatches(category?: string, club?: string) {
+    static async getNextMatches(managerId: string, category?: string, club?: string) {
         const now = moment();
 
         const size = '50';
@@ -244,7 +229,7 @@ export class Api {
         let filter = [
             `datetime>${now.format("YYYY-MM-DD")}`,
             `round.group.tournament.season.id:${season}`,
-            `round.group.tournament.manager.id:${manager}`
+            `round.group.tournament.manager.id:${managerId}`
         ];
 
         if (club) {
@@ -259,15 +244,15 @@ export class Api {
         let page = `page[size]=${size}&page[number]=${pageNumber}`
 
         const response = await fetch(`${url}/matches?filter=${filter.join(',')}&sort=datetime&include=${include}&${page}`);
-        const data = await response.json() as MatchResponse;
-        return data;
+        const { data = [], included = [] } = await response.json() as MatchResponse;
+        return { data, included };
     }
 
-    static async getClubs() {
+    static async getClubs(managerId: string) {
         const page = `page[size]=250&page[number]=1`;
 
         let filter = [
-            `club.manager.id:${manager}`,
+            `club.manager.id:${managerId}`,
             `registrable[tournament].discipline.id:${discipline}`,
             `registrable[tournament].season.id:${season}`
         ];
@@ -281,8 +266,12 @@ export class Api {
             return name.replace(/^(C\.N\.|U\.E\.|C\.E\.|C\.W\.|C\.E\.F\.)\s*/, '').trim();
         };
 
-        return (data.included as Club[]).sort((a, b) => {
+        const a = (data.included as Club[]).sort((a, b) => {
             return clean(a.attributes.name).localeCompare(clean(b.attributes.name))
         });
+
+        console.log(JSON.stringify(a.map(i => ({ id: i.id, name: i.attributes.name }))))
+
+        return a;
     }
 }

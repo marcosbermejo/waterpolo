@@ -1,39 +1,87 @@
 import React from 'react';
-import { Api, Group, MatchResponse, Tournament, Team, Round, Facility, Category, categories, Club } from './Api';
-import { Box, FormControl, MenuItem, Select, Stack, Typography } from '@mui/material';
+import { Api, Group, MatchResponse, Tournament, Team, Round, Facility, Category } from './Api';
+import { AppBar, Box, Button, FormControl, MenuItem, Modal, Select, Stack, Toolbar, Typography } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import TeamItem from './Team';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import { parse, format } from 'date-fns';
+import clubs from './data/clubs.json';
+import categories from './data/categories.json';
 
+const fcn = '314965';
+const rfen = '210453';
 
 function App() {
+  const params = new URLSearchParams(window.location.search);
 
+
+  const [open, setOpen] = React.useState(false);
   const [loading, setLoading] = React.useState<boolean>(false);
-  const [club, setClub] = React.useState<string>('');
-  const [category, setCategory] = React.useState<string>('');
+  const [selectedClub, setSelectedClub] = React.useState<string>(params.get('club') || '');
+  const [selectedCategory, setSelectedCategory] = React.useState<string>(params.get('categoria') || '');
+
   const [matches, setMatches] = React.useState<MatchResponse>({ data: [], included: [] });
-  const [clubs, setClubs] = React.useState<Club[]>([])
 
-  React.useEffect(() => {
-    loadClubs();
-  }, [])
-
-  React.useEffect(() => {
-    loadMatches(category, club);
-  }, [category, club])
-
-  const loadMatches = async (category: string, club: string) => {
+  const loadMatches = async () => {
     setLoading(true);
-    const matches = await Api.getNextMatches(category, club);
+
+    console.log(selectedCategory, selectedClub)
+
+    const allCategories = selectedCategory === ''
+    const allClubs = selectedClub === ''
+
+    const { fcnId: categoryFcnId, rfenId: categoryRfenId, gender } = categories.find(c => c.id === selectedCategory) || {}
+    const { fcnId: clubFcnId, rfenId: clubRfenId } = clubs.find(c => c.id === selectedClub) || {}
+
+    let fcnMatches: MatchResponse = { data: [], included: [] };
+    let rfenMatches: MatchResponse = { data: [], included: [] };
+
+    const isFcnSearch = (allCategories && allClubs)
+      || (allCategories && clubFcnId)
+      || (categoryFcnId && allClubs)
+      || (categoryFcnId && clubFcnId)
+
+    const isRfenSearch = (allCategories && allClubs)
+      || (allCategories && clubRfenId)
+      || (categoryRfenId && allClubs)
+      || (categoryRfenId && clubRfenId)
+
+    if (isFcnSearch) {
+      fcnMatches = await Api.getNextMatches(fcn, categoryFcnId, clubFcnId);
+    }
+
+    if (isRfenSearch) {
+      rfenMatches = await Api.getNextMatches(rfen, categoryRfenId, clubRfenId);
+
+      if (gender) {
+        const genderTournamentIds = rfenMatches.included
+          .filter(({ type, attributes }) => type === 'tournament' && attributes.gender === gender)
+          .map(({ id }) => id);
+
+        const genderGroups = rfenMatches.included
+          .filter((element) => element.type === 'group' && genderTournamentIds.includes(element.relationships.tournament.data.id))
+          .map(({ id }) => id);
+
+        const genderRounds = rfenMatches.included
+          .filter((element) => element.type === 'round' && genderGroups.includes(element.relationships.group.data.id))
+          .map(({ id }) => id);
+
+        rfenMatches.data = rfenMatches.data.filter(({ relationships: { round } }) => round.data?.id && genderRounds.includes(round.data.id))
+      }
+
+    }
+
+    const included = fcnMatches.included.concat(rfenMatches.included);
+    const data = fcnMatches.data.concat(rfenMatches.data);
+    data.sort((a, b) => (a.attributes.date || '')?.localeCompare(b.attributes.date || ''));
+
     setLoading(false);
-    setMatches(matches);
+    setMatches({ data, included });
   }
 
-  const loadClubs = async () => {
-    const clubs = await Api.getClubs();
-    setClubs(clubs);
-  }
+  React.useEffect(() => {
+    loadMatches()
+  }, [])
 
   const tournamentName = (roundId?: string | null) => {
     if (!roundId) return '';
@@ -102,23 +150,33 @@ function App() {
     }
   };
 
+  const modalStyle = {
+    position: 'absolute' as 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: '100%',
+    maxWidth: 400,
+    bgcolor: 'background.paper',
+    boxShadow: 24,
+    p: 4,
+  };
+
   return (
     <div>
-      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-        <FormControl sx={{ width: '200px' }}>
-          <Select value={category} displayEmpty onChange={(e) => setCategory(e.target.value)}>
-            <MenuItem key={'0'} value={''}>Totes les categories</MenuItem>
-            {categories.map(({ id, name }) => <MenuItem key={id} value={id}>{name}</MenuItem>)}
-          </Select>
-        </FormControl>
 
-        <FormControl sx={{ flexGrow: 1 }}>
-          <Select value={club} displayEmpty onChange={(e) => setClub(e.target.value)}>
-            <MenuItem key={'0'} value={''}>Tots els clubs</MenuItem>
-            {clubs.map(({ id, attributes: { name } }) => <MenuItem key={id} value={id}>{name}</MenuItem>)}
-          </Select>
-        </FormControl>
+      <Box sx={{ flexGrow: 1 }}>
+        <AppBar position="static">
+          <Toolbar>
+            <Button color="inherit" onClick={() => setOpen(true)} variant='outlined' sx={{ mr: 2, position: 'absolute' }}>FILTRES</Button>
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1, textAlign: 'center' }}>
+              Pròxims partits
+            </Typography>
+          </Toolbar>
+        </AppBar>
       </Box>
+
+
 
       {
         loading && <Typography>Loading...</Typography>
@@ -127,11 +185,11 @@ function App() {
       {
         !loading && matches.data.length === 0 && <Typography>
           No hi ha dades de <strong>
-          "{category ? categories.find(c => c.id === category)?.name : 'Totes les categories'}"
-          </strong> per al club <strong>"{club ? clubs.find(c => c.id === club)?.attributes.name : 'Tots els clubs'}"</strong>
+            "{selectedCategory ? categories.find(c => `${c.id}` === selectedCategory)?.name : 'Totes les categories'}"
+          </strong> per al club <strong>
+            "{selectedClub ? clubs.find(c => `${c.id}` === selectedClub)?.name : 'Tots els clubs'}"</strong>.
         </Typography>
       }
-
 
       {
         !loading && matches.data.map(({ id, meta, attributes, relationships: { round, facility } }) => {
@@ -147,9 +205,9 @@ function App() {
           const { day, hour } = parseDate(attributes.date);
 
           return (
-            <Grid key={id} container spacing={2} border={1} mb={2}>
+            <Grid key={id} container spacing={2} borderBottom={1} mb={2}>
               <Grid size={12}>
-                <Typography textAlign={'center'} fontWeight={'bold'}>
+                <Typography textAlign={'center'} fontWeight={'bold'} mt={2}>
                   {tournament}
                 </Typography>
               </Grid>
@@ -179,6 +237,40 @@ function App() {
           )
         })
       }
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        aria-labelledby="modal-modal-title"
+        aria-describedby="modal-modal-description"
+      >
+        <Box sx={modalStyle}>
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <Select value={selectedCategory} displayEmpty onChange={(e) => setSelectedCategory(e.target.value)}>
+              <MenuItem key={'0'} value={''}>Totes les categories</MenuItem>
+              {categories.map(({ id, name }) => <MenuItem key={id} value={id}>{name}</MenuItem>)}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth>
+            <Select value={selectedClub} displayEmpty onChange={(e) => setSelectedClub(e.target.value)}>
+              <MenuItem key={'0'} value={''}>Tots els clubs</MenuItem>
+              {clubs.map(({ id, name }, i) => <MenuItem key={i} value={id}>{name}</MenuItem>)}
+            </Select>
+          </FormControl>
+
+          <Box display='flex' justifyContent='flex-end'>
+            <Button sx={{ mt: 2 }} onClick={() => {
+              const url = new URL(window.location.origin);
+              if (selectedCategory)     url.searchParams.append('categoria', selectedCategory);
+              if (selectedClub)     url.searchParams.append('club', selectedClub);
+              window.history.pushState({}, '', url);
+              loadMatches();
+              setOpen(false);
+            }} variant='outlined'>APLICAR FILTROS</Button>
+          </Box>
+        </Box>
+      </Modal>
     </div>
   );
 }
