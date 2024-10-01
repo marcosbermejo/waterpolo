@@ -2,7 +2,7 @@ import { Stack, Typography, Paper, Box } from "@mui/material";
 import { Team } from "./Api";
 
 type TeamProps = {
-  team?: Team,
+  team?: Team | null,
   direction?: 'column' | 'row',
   size?: number,
   fontSize?: number | { xs?: number, sm?: number },
