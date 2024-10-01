@@ -1,6 +1,6 @@
 import React from 'react';
 import { Api, Group, MatchResponse, Tournament, Team, Round, Facility, Category } from './Api';
-import { AppBar, Box, Button, FormControl, MenuItem, Modal, Select, Stack, Toolbar, Typography } from '@mui/material';
+import { AppBar, Box, Button, CircularProgress, FormControl, MenuItem, Modal, Select, Stack, Toolbar, Typography } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import TeamItem from './Team';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -179,7 +179,10 @@ function App() {
 
 
       {
-        loading && <Typography>Loading...</Typography>
+        loading && <Box display={'flex'} justifyContent={'center'} alignItems={'center'} flexDirection={'column'} height={'50vh'}>
+          <CircularProgress />
+          <Typography mt={2}>Loading...</Typography>
+        </Box>
       }
 
       {
@@ -262,8 +265,8 @@ function App() {
           <Box display='flex' justifyContent='flex-end'>
             <Button sx={{ mt: 2 }} onClick={() => {
               const url = new URL(window.location.origin);
-              if (selectedCategory)     url.searchParams.append('categoria', selectedCategory);
-              if (selectedClub)     url.searchParams.append('club', selectedClub);
+              if (selectedCategory) url.searchParams.append('categoria', selectedCategory);
+              if (selectedClub) url.searchParams.append('club', selectedClub);
               window.history.pushState({}, '', url);
               loadMatches();
               setOpen(false);
