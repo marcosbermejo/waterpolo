@@ -1,4 +1,5 @@
 import moment from 'moment';
+import { Period } from './Filter';
 const url = 'https://api.leverade.com';
 const discipline = '14';
 const season = '7618';
@@ -220,14 +221,14 @@ export type TeamsResponse = {
 
 export class Api {
 
-    static async getNextMatches(managerId: string, category?: string, club?: string) {
+    static async getNextMatches(selectedPeriod: Period, managerId: string, category?: string, club?: string) {
         const now = moment();
 
         const size = '50';
         const pageNumber = '1';
 
         let filter = [
-            `datetime>${now.format("YYYY-MM-DD")}`,
+            `datetime${selectedPeriod === Period.FUTURE ? '>' : '<'}${now.format("YYYY-MM-DD")}`,
             `round.group.tournament.season.id:${season}`,
             `round.group.tournament.manager.id:${managerId}`
         ];
@@ -243,7 +244,7 @@ export class Api {
         let include = 'round.group.tournament,round.group.tournament.category,teams,teams,facility';
         let page = `page[size]=${size}&page[number]=${pageNumber}`
 
-        const response = await fetch(`${url}/matches?filter=${filter.join(',')}&sort=datetime&include=${include}&${page}`);
+        const response = await fetch(`${url}/matches?filter=${filter.join(',')}&sort=${selectedPeriod === Period.FUTURE ? '' : '-'}datetime&include=${include}&${page}`);
         const { data = [], included = [] } = await response.json() as MatchResponse;
         return { data, included };
     }

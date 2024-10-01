@@ -1,13 +1,13 @@
 import React from 'react';
 import { Api, Group, MatchResponse, Tournament, Team, Round, Facility, Category } from './Api';
-import { AppBar, Box, Button, CircularProgress, FormControl, MenuItem, Modal, Select, Stack, Toolbar, Typography } from '@mui/material';
 import clubs from './data/clubs.json';
 import categories from './data/categories.json';
 import Match, { MatchProps } from './Match';
 import parseDate from './util/parseDate';
 import Header from './Header';
 import Loading from './Loading';
-import Filter, { FilterProps } from './Filter';
+import Filter, { FilterProps, Period, SelectedFilter } from './Filter';
+import Empty from './Empty';
 
 const fcn = '314965';
 const rfen = '210453';
@@ -19,17 +19,23 @@ function App() {
   const [matches, setMatches] = React.useState<MatchResponse>({ data: [], included: [] });
 
   const params = new URLSearchParams(window.location.search);
-  const [selectedClub, setSelectedClub] = React.useState<string>(params.get('club') || '');
-  const [selectedCategory, setSelectedCategory] = React.useState<string>(params.get('categoria') || '');
 
-  const loadMatches = async () => {
+  const defaultCategory = params.get('category') || '';
+  const defaultClub = params.get('club') || '';
+  const defaultPeriod = params.get('period') === '-1' ? Period.PAST : Period.FUTURE;
+
+  const [selectedPeriod, setSelectedPeriod] = React.useState<Period>(defaultPeriod);
+  const [selectedClub, setSelectedClub] = React.useState<string>(defaultClub);
+  const [selectedCategory, setSelectedCategory] = React.useState<string>(defaultCategory);
+
+  const loadMatches = async (filter: SelectedFilter) => {
     setLoading(true);
 
-    const allCategories = selectedCategory === ''
-    const allClubs = selectedClub === ''
+    const allCategories = filter.selectedCategory === ''
+    const allClubs = filter.selectedClub === ''
 
-    const { fcnId: categoryFcnId, rfenId: categoryRfenId, gender } = categories.find(c => c.id === selectedCategory) || {}
-    const { fcnId: clubFcnId, rfenId: clubRfenId } = clubs.find(c => c.id === selectedClub) || {}
+    const { fcnId: categoryFcnId, rfenId: categoryRfenId, gender } = categories.find(c => c.id === filter.selectedCategory) || {}
+    const { fcnId: clubFcnId, rfenId: clubRfenId } = clubs.find(c => c.id === filter.selectedClub) || {}
 
     let fcnMatches: MatchResponse = { data: [], included: [] };
     let rfenMatches: MatchResponse = { data: [], included: [] };
@@ -45,11 +51,11 @@ function App() {
       || (categoryRfenId && clubRfenId)
 
     if (isFcnSearch) {
-      fcnMatches = await Api.getNextMatches(fcn, categoryFcnId, clubFcnId);
+      fcnMatches = await Api.getNextMatches(filter.selectedPeriod, fcn, categoryFcnId, clubFcnId);
     }
 
     if (isRfenSearch) {
-      rfenMatches = await Api.getNextMatches(rfen, categoryRfenId, clubRfenId);
+      rfenMatches = await Api.getNextMatches(filter.selectedPeriod, rfen, categoryRfenId, clubRfenId);
 
       if (gender) {
         const genderTournamentIds = rfenMatches.included
@@ -71,7 +77,7 @@ function App() {
 
     const included = fcnMatches.included.concat(rfenMatches.included);
     const data = fcnMatches.data.concat(rfenMatches.data);
-    data.sort((a, b) => (a.attributes.date || '')?.localeCompare(b.attributes.date || ''));
+    data.sort((a, b) => ((a.attributes.date || '')?.localeCompare(b.attributes.date || '')) * filter.selectedPeriod);
 
     setLoading(false);
     setMatches({ data, included });
@@ -84,22 +90,27 @@ function App() {
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    loadMatches()
+    loadMatches({ selectedCategory: defaultCategory, selectedClub: defaultClub, selectedPeriod: defaultPeriod })
   }, [])
 
   const filterProps: FilterProps = {
     open,
-    selectedCategory,
-    selectedClub,
+    defaultCategory: params.get('category') || '',
+    defaultClub: params.get('club') || '',
+    defaultPeriod: Period.FUTURE,
     setOpen,
-    setSelectedCategory,
-    setSelectedClub,
-    applyFilters: () => {
+    applyFilters: (filter) => {
       const url = new URL(window.location.origin);
-      if (selectedCategory) url.searchParams.append('categoria', selectedCategory);
-      if (selectedClub) url.searchParams.append('club', selectedClub);
+      if (filter.selectedCategory) url.searchParams.append('category', filter.selectedCategory);
+      if (filter.selectedClub) url.searchParams.append('club', filter.selectedClub);
+      if (filter.selectedPeriod) url.searchParams.append('period', filter.selectedPeriod.toString());
       window.history.pushState({}, '', url);
-      loadMatches();
+
+      setSelectedPeriod(filter.selectedPeriod);
+      setSelectedCategory(filter.selectedCategory);
+      setSelectedClub(filter.selectedClub);
+
+      loadMatches(filter);
       setOpen(false);
     }
   }
@@ -107,18 +118,13 @@ function App() {
   return (
     <div>
 
-      <Header onOpenFilter={() => setOpen(true)} />
+      <Header onOpenFilter={() => setOpen(true)} period={selectedPeriod} />
       <Filter {...filterProps} />
 
-      { loading && <Loading /> }
+      {loading && <Loading />}
 
       {
-        !loading && matches.data.length === 0 && <Typography>
-          No hi ha dades de <strong>
-            "{selectedCategory ? categories.find(c => `${c.id}` === selectedCategory)?.name : 'Totes les categories'}"
-          </strong> per al club <strong>
-            "{selectedClub ? clubs.find(c => `${c.id}` === selectedClub)?.name : 'Tots els clubs'}"</strong>.
-        </Typography>
+        !loading && matches.data.length === 0 && <Empty {...{ selectedCategory, selectedClub, selectedPeriod }} />
       }
 
       {
@@ -149,6 +155,9 @@ function App() {
           return <Match key={id} {...matchProps} />
         })
       }
+
+
+
     </div>
   );
 }
