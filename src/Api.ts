@@ -27,6 +27,7 @@ export type Match = {
         facility: { data: { type: "facility", id: string | null } | null }
         round: { data: { type: "round", id: string | null } | null }
         teams: { data: { type: "team", id: string | null }[] | null }
+        results: { data: { type: "result", id: string | null }[] | null }
     }
 }
 
@@ -209,9 +210,44 @@ export type Club = {
     }
 }
 
+export type Result = {
+    type: "result",
+    id: string
+    attributes: {
+        value: number
+        score: number
+        created_at: string
+        updated_at: string
+    },
+    relationships: {
+        match: {
+            data: {
+                id: string
+                type: "match"
+            }
+        },
+        parent: {
+            data: {
+                id: string,
+                type: "match"
+            }
+        },
+        team: {
+            data: {
+                id: string,
+                type: "team"
+            }
+        },
+        period: {
+            data: null
+        }
+    }
+
+}
+
 export type MatchResponse = {
     data: Match[],
-    included: (Tournament | Group | Facility | Round | Team | Category)[]
+    included: (Tournament | Group | Facility | Round | Team | Category | Result)[]
 }
 
 export type TeamsResponse = {
@@ -224,8 +260,6 @@ export class Api {
     static async getNextMatches(selectedPeriod: Period, managerId: string, category?: string, club?: string) {
         const now = moment();
 
-        const size = '50';
-        const pageNumber = '1';
 
         let filter = [
             `datetime${selectedPeriod === Period.FUTURE ? '>' : '<'}${now.format("YYYY-MM-DD")}`,
@@ -241,10 +275,14 @@ export class Api {
             filter.push(`round.group.tournament.category.id:${category}`)
         }
 
-        let include = 'round.group.tournament,round.group.tournament.category,teams,teams,facility';
-        let page = `page[size]=${size}&page[number]=${pageNumber}`
+        const fetchUrl = new URL(`${url}/matches`);
+        fetchUrl.searchParams.set('filter', filter.join(','));
+        fetchUrl.searchParams.set('sort', `${selectedPeriod === Period.FUTURE ? '' : '-'}datetime`);
+        fetchUrl.searchParams.set('include', 'round.group.tournament,round.group.tournament.category,teams,results,facility')
+        fetchUrl.searchParams.set('page[size]', '50')
+        fetchUrl.searchParams.set('page[number]', '1')
 
-        const response = await fetch(`${url}/matches?filter=${filter.join(',')}&sort=${selectedPeriod === Period.FUTURE ? '' : '-'}datetime&include=${include}&${page}`);
+        const response = await fetch(fetchUrl);
         const { data = [], included = [] } = await response.json() as MatchResponse;
         return { data, included };
     }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Api, Group, MatchResponse, Tournament, Team, Round, Facility, Category } from './Api';
+import { Api, Group, MatchResponse, Tournament, Team, Round, Facility, Category, Result } from './Api';
 import clubs from './data/clubs.json';
 import categories from './data/categories.json';
 import Match, { MatchProps } from './Match';
@@ -27,6 +27,10 @@ function App() {
   const [selectedPeriod, setSelectedPeriod] = React.useState<Period>(defaultPeriod);
   const [selectedClub, setSelectedClub] = React.useState<string>(defaultClub);
   const [selectedCategory, setSelectedCategory] = React.useState<string>(defaultCategory);
+
+  React.useEffect(() => {
+    loadMatches({ selectedCategory: defaultCategory, selectedClub: defaultClub, selectedPeriod: defaultPeriod })
+  }, [])
 
   const loadMatches = async (filter: SelectedFilter) => {
     setLoading(true);
@@ -83,27 +87,23 @@ function App() {
     setMatches({ data, included });
   }
 
-  const findObject = (objectId: string | undefined | null, objectType: 'round' | 'group' | 'tournament' | 'category' | 'team' | 'facility') => (
+  const findObject = (objectId: string | undefined | null, objectType: 'round' | 'group' | 'tournament' | 'category' | 'team' | 'facility' | 'result' ) => (
     objectId
       ? matches.included.find(({ type, id }) => type === objectType && id === objectId)
       : null);
 
-  React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    loadMatches({ selectedCategory: defaultCategory, selectedClub: defaultClub, selectedPeriod: defaultPeriod })
-  }, [])
 
   const filterProps: FilterProps = {
     open,
-    defaultCategory: params.get('category') || '',
-    defaultClub: params.get('club') || '',
-    defaultPeriod: Period.FUTURE,
+    defaultCategory,
+    defaultClub,
+    defaultPeriod,
     setOpen,
     applyFilters: (filter) => {
-      const url = new URL(window.location.origin);
-      if (filter.selectedCategory) url.searchParams.append('category', filter.selectedCategory);
-      if (filter.selectedClub) url.searchParams.append('club', filter.selectedClub);
-      if (filter.selectedPeriod) url.searchParams.append('period', filter.selectedPeriod.toString());
+      const url = new URL(window.location.href);
+      if (filter.selectedCategory) url.searchParams.set('category', filter.selectedCategory); else url.searchParams.delete('category');
+      if (filter.selectedClub) url.searchParams.set('club', filter.selectedClub); else url.searchParams.delete('club');
+      if (filter.selectedPeriod) url.searchParams.set('period', filter.selectedPeriod.toString());
       window.history.pushState({}, '', url);
 
       setSelectedPeriod(filter.selectedPeriod);
@@ -139,6 +139,9 @@ function App() {
           const homeTeam = findObject(meta.home_team, 'team') as Team | null;
           const awayTeam = findObject(meta.away_team, 'team') as Team | null;
 
+          const result1 =  findObject(relationships.results.data ? relationships.results.data[0]?.id : null, 'result') as Result | null;
+          const result2 =  findObject(relationships.results.data ? relationships.results.data[1]?.id : null, 'result') as Result | null;
+
           const { day, hour } = parseDate(attributes.date);
 
           const matchProps: MatchProps = {
@@ -148,6 +151,8 @@ function App() {
             facility,
             homeTeam,
             awayTeam,
+            homeTeamResult: homeTeam ? [result1, result2].find(r => r?.relationships.team.data.id === homeTeam.id) || null : null,
+            awayTeamResult: awayTeam ? [result1, result2].find(r => r?.relationships.team.data.id === awayTeam.id) || null : null,
             day,
             hour
           }

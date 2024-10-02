@@ -54,7 +54,7 @@ export default function Filter({
             }}>
                 <FormControl fullWidth sx={{ mb: 2 }}>
                     <Select value={selectedPeriod} displayEmpty onChange={(e) => setSelectedPeriod(+e.target.value)}>
-                        <MenuItem value={Period.FUTURE}>Pròxims partits</MenuItem>
+                        <MenuItem value={Period.FUTURE}>Propers partits</MenuItem>
                         <MenuItem value={Period.PAST}>Partits passats</MenuItem>
                     </Select>
                 </FormControl>
